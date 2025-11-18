@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Three-Phase Coin & Dice Game</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--accent:#06b6d4;--muted:#94a3b8;--ok:#10b981;--bad:#ef4444}
+    html,body{height:100%;margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;background:linear-gradient(180deg,#071027 0%, #071428 60%);color:#e6eef6}
+    .wrap{max-width:920px;margin:48px auto;padding:28px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;box-shadow:0 8px 30px rgba(2,6,23,0.6)}
+    h1{margin:0 0 8px;font-size:20px}
+    p.lead{color:var(--muted);margin:0 0 18px}
+    .controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+    button{background:#071a2a;border:1px solid rgba(255,255,255,0.04);color:var(--accent);padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:600}
+    button.secondary{background:transparent;color:var(--muted);border:1px dashed rgba(255,255,255,0.03);font-weight:500}
+    button:disabled{opacity:0.35;cursor:not-allowed}
+    .board{display:flex;gap:18px;align-items:center}
+    .coin{width:86px;height:86px;border-radius:50%;background:linear-gradient(180deg,#f8fafc,#e6eef6);display:flex;align-items:center;justify-content:center;color:#082032;font-weight:900;font-size:36px;box-shadow:inset 0 -6px 12px rgba(0,0,0,0.12), 0 8px 20px rgba(2,6,23,0.6)}
+    .die{width:72px;height:72px;border-radius:10px;background:#fff;color:#0b1220;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;box-shadow:0 8px 20px rgba(2,6,23,0.45);padding:6px;box-sizing:border-box}
+    .pips{width:100%;height:100%;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:4px}
+    .pips .cell{display:flex;align-items:center;justify-content:center}
+    .pips .pip{width:12px;height:12px;border-radius:50%;background:#082032;box-shadow:0 2px 4px rgba(2,6,23,0.35)}
+    .pips.empty .cell{opacity:0.25}
+    .dice-row{display:flex;gap:12px;align-items:center}
+    .status{margin-top:16px;padding:12px;border-radius:8px;background:rgba(255,255,255,0.02);color:var(--muted)}
+    .status .ok{color:var(--ok);font-weight:700}
+    .status .bad{color:var(--bad);font-weight:700}
+    .points-box{margin-top:12px;padding:12px;border-radius:8px;background:rgba(255,255,255,0.02);color:var(--muted);font-weight:700}
+    .points-box .value{color:var(--accent);font-size:18px;margin-left:6px}
+    table{border-spacing:0}
+    table th, table td{padding:8px 6px}
+    /* column widths and alignment to keep table headers aligned with values */
+    #expectTable{table-layout:fixed}
+    #expectTable th:nth-child(1), #expectTable td:nth-child(1){width:40%;text-align:left}
+    #expectTable th:nth-child(2), #expectTable td:nth-child(2){width:20%;text-align:right}
+    #expectTable th:nth-child(3), #expectTable td:nth-child(3){width:20%;text-align:right}
+    #expectTable th:nth-child(4), #expectTable td:nth-child(4){width:20%;text-align:right}
+    .hidden-row{display:none}
+    .small{font-size:13px;color:var(--muted)}
+    .spacer{flex:1}
+    /* simple rolling animation (JS toggles a .rolling class) */
+    .rolling{animation:shake 800ms ease-in-out}
+    @keyframes shake{0%{transform:translateY(0) rotate(0)}20%{transform:translateY(-6px) rotate(-6deg)}40%{transform:translateY(6px) rotate(6deg)}60%{transform:translateY(-4px) rotate(-3deg)}80%{transform:translateY(2px) rotate(2deg)}100%{transform:translateY(0) rotate(0)}}
+    /* layout for explanation */
+    .row{display:flex;align-items:center;gap:14px}
+    footer{margin-top:16px;color:var(--muted);font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Three-Phase Coin & Dice Game</h1>
+    <p class="lead">Phase 1: Flip a coin — get Heads to continue. Phase 2: Roll two dice — sum of 7 ends game. Phase 3: Roll three dice individually to score points as (die1 + die3 - die2).</p>
+
+    <div class="controls">
+      <button id="resetBtn">Reset Game</button>
+
+      <div class="row">
+        <button id="flipBtn">Flip Coin</button>
+        <div id="coin" class="coin">?</div>
+      </div>
+
+      <div class="row">
+        <button id="roll2Btn" disabled>Roll 2 Dice</button>
+        <div class="dice-row">
+          <div id="dieA" class="die">-</div>
+          <div id="dieB" class="die">-</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div style="display:flex;flex-direction:column;gap:8px;align-items:center">
+          <div style="display:flex;gap:8px;align-items:center">
+            <button id="roll1Btn" disabled>Roll Die 1</button>
+            <button id="roll2singleBtn" disabled>Roll Die 2</button>
+            <button id="roll3Btn" disabled>Roll Die 3</button>
+          </div>
+          <div class="dice-row">
+            <div id="die1" class="die">-</div>
+            <div id="die2" class="die">-</div>
+            <div id="die3" class="die">-</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="spacer"></div>
+    </div>
+
+    <div class="status" id="status">Ready. Click <strong>Flip Coin</strong> to start.</div>
+
+    <div id="pointsBox" class="points-box" aria-live="polite">Points: <span id="pointsValue">-</span></div>
+    <!-- expectation progress table -->
+    <div class="expectation" style="margin-top:14px">
+      <h3 style="margin:6px 0;color:var(--muted);font-size:14px">Expectation progress</h3>
+      <table id="expectTable" style="width:100%;border-collapse:collapse">
+        <thead>
+          <tr style="color:var(--muted)"><th>Step</th><th>Previous</th><th>Expected</th><th>&#x0394;</th></tr>
+        </thead>
+        <tbody>
+              <tr data-step="start" class="hidden-row"><td>Start</td><td>-</td><td class="exp-val" data-step="start"></td><td class="delta" data-step="start">-</td></tr>
+          <tr data-step="coin" class="hidden-row"><td>Coin</td><td class="prev" data-step="coin"></td><td class="exp-val" data-step="coin"></td><td class="delta" data-step="coin"></td></tr>
+          <tr data-step="twoDice" class="hidden-row"><td>Two dice</td><td class="prev" data-step="twoDice"></td><td class="exp-val" data-step="twoDice"></td><td class="delta" data-step="twoDice"></td></tr>
+          <tr data-step="die1" class="hidden-row"><td>Die 1</td><td class="prev" data-step="die1"></td><td class="exp-val" data-step="die1"></td><td class="delta" data-step="die1"></td></tr>
+          <tr data-step="die2" class="hidden-row"><td>Die 2</td><td class="prev" data-step="die2"></td><td class="exp-val" data-step="die2"></td><td class="delta" data-step="die2"></td></tr>
+          <tr data-step="die3" class="hidden-row"><td>Die 3 (Final)</td><td class="prev" data-step="die3"></td><td class="exp-val" data-step="die3"></td><td class="delta" data-step="die3"></td></tr>
+              <tr data-step="total" style="border-top:1px solid rgba(255,255,255,0.03)"><td><strong>Total</strong></td><td class="prev" data-step="total"></td><td><strong class="exp-val" data-step="total"></strong></td><td class="delta" data-step="total"></td></tr>
+        </tbody>
+      </table>
+      <div class="small" style="margin-top:6px">Start expected set to <strong>1.25</strong> by default.</div>
+    </div>
+
+    <footer class="small">Use <strong>Reset Game</strong> to restart at any time.</footer>
+  </div>
+
+  <script>
+    // Elements
+    const resetBtn = document.getElementById('resetBtn');
+    const flipBtn = document.getElementById('flipBtn');
+    const coinEl = document.getElementById('coin');
+    const roll2Btn = document.getElementById('roll2Btn');
+    const dieA = document.getElementById('dieA');
+    const dieB = document.getElementById('dieB');
+
+    const roll1Btn = document.getElementById('roll1Btn');
+    const roll2singleBtn = document.getElementById('roll2singleBtn');
+    const roll3Btn = document.getElementById('roll3Btn');
+    const die1 = document.getElementById('die1');
+    const die2 = document.getElementById('die2');
+    const die3 = document.getElementById('die3');
+
+    const status = document.getElementById('status');
+    const pointsBox = document.getElementById('pointsBox');
+    const pointsValue = document.getElementById('pointsValue');
+    // expectation table elements
+    const expEls = document.querySelectorAll('.exp-val');
+    const prevEls = document.querySelectorAll('.prev');
+    const deltaEls = document.querySelectorAll('.delta');
+
+    // constants for expectation math
+    const E_FINAL = 3.5; // expected score if final round reached
+    const P_HEADS = 0.5;
+    const P_SUM7 = 6/36; // two dice sum 7 probability
+    const P_PASS2 = 1 - P_SUM7; // probability to pass two-dice
+    const E_START = 1.25; // user-specified default start expectation
+
+    // State
+    let phase = 1; // 1 coin, 2 two-dice, 3 three-dice
+    let lastCoin = null; // 'H' or 'T'
+    let twoDiceValues = [null, null];
+    let threeDiceValues = [null, null, null];
+
+    function setStatus(html, kind){
+      status.innerHTML = html;
+      status.classList.remove('ok','bad');
+      if(kind) status.classList.add(kind);
+    }
+
+    // Update expectation table. This computes expected values for each step
+    // and updates the DOM. Values reflect the expectation after the step.
+    function updateExpectationTable(){
+      // compute expected points when at start (user-specified)
+      const vStart = E_START;
+
+      // expected afterward flipping the coin (unconditional start->after coin)
+      // If coin not yet flipped: expected is chance to get to final * E_FINAL
+      let vAfterCoin;
+      if(lastCoin === 'H'){
+        // if coin is heads, expected is expectation given we got heads
+        vAfterCoin = P_PASS2 * E_FINAL; // still need to clear two-dice
+      } else if(lastCoin === 'T'){
+        vAfterCoin = 0; // immediate game over
+      } else {
+        // not flipped yet -> unconditional
+        vAfterCoin = P_HEADS * P_PASS2 * E_FINAL;
+      }
+
+      // expected after two dice
+      let vAfterTwoDice;
+      if(lastCoin === 'T'){
+        vAfterTwoDice = 0;
+      } else if(lastCoin === 'H'){
+        if(twoDiceValues[0] != null && twoDiceValues[1] != null){
+          // if rolled already, either lost or continue
+          const sum = twoDiceValues[0] + twoDiceValues[1];
+          vAfterTwoDice = (sum === 7) ? 0 : E_FINAL;
+        } else {
+          // not rolled yet — conditional on having passed coin
+          vAfterTwoDice = P_PASS2 * E_FINAL;
+        }
+      } else {
+        vAfterTwoDice = P_HEADS * P_PASS2 * E_FINAL;
+      }
+
+      // expected after die1
+      let vAfterDie1;
+      if(phase < 3){
+        // we haven't reached individual dice phase yet — expectation is still overall unconditional
+        vAfterDie1 = P_HEADS * P_PASS2 * E_FINAL;
+      } else {
+        // in phase 3: if die1 rolled, its observed value sets next expectation
+        if(threeDiceValues[0] != null){
+          // known die1, expectation becomes die1 + E(d3) - E(d2) = die1
+          vAfterDie1 = threeDiceValues[0];
+        } else {
+          // not rolled yet
+          vAfterDie1 = E_FINAL; // expected objective when only die1 still to roll
+        }
+      }
+
+      // expected after die2
+      let vAfterDie2;
+      if(phase < 3){
+        vAfterDie2 = P_HEADS * P_PASS2 * E_FINAL;
+      } else {
+        if(threeDiceValues[0] != null && threeDiceValues[1] != null){
+          // die1 and die2 known, expected becomes die1 + E(d3) - die2
+          vAfterDie2 = threeDiceValues[0] + E_FINAL - threeDiceValues[1];
+        } else if(threeDiceValues[0] != null){
+          // die1 known, die2 unknown -> expectation = die1 + E(d3) - E(d2) = die1
+          vAfterDie2 = threeDiceValues[0];
+        } else {
+          vAfterDie2 = E_FINAL;
+        }
+      }
+
+      // expected after die3 (final)
+      let vAfterDie3;
+      if(phase < 3){
+        vAfterDie3 = P_HEADS * P_PASS2 * E_FINAL;
+      } else {
+        if(threeDiceValues[0] != null && threeDiceValues[1] != null && threeDiceValues[2] != null){
+          // final score known
+          vAfterDie3 = threeDiceValues[0] + threeDiceValues[2] - threeDiceValues[1];
+        } else {
+          // before final roll, expected is still E_FINAL
+          vAfterDie3 = E_FINAL;
+        }
+      }
+
+      // total is the same as unconditional expected from start (set by user)
+      const vTotal = vStart;
+
+      const map = {
+        start: vStart,
+        coin: vAfterCoin,
+        twoDice: vAfterTwoDice,
+        die1: vAfterDie1,
+        die2: vAfterDie2,
+        die3: vAfterDie3,
+        total: vTotal
+      };
+
+      // update previous and expected cells and deltas
+      const steps = ['start','coin','twoDice','die1','die2','die3','total'];
+      for(let i=0;i<steps.length;i++){
+        const step = steps[i];
+        const expected = map[step];
+        // update expected field
+        const expectedEls = document.querySelectorAll(`.exp-val[data-step="${step}"]`);
+        expectedEls.forEach(e=> e.textContent = (expected===undefined?'-':(typeof expected === 'number'? expected.toFixed(2) : expected)));
+        // previous is previous step's expected or '-' for start
+        const prev = i===0 ? '-' : map[steps[i-1]];
+        const prevElsForStep = document.querySelectorAll(`.prev[data-step="${step}"]`);
+        prevElsForStep.forEach(e=> e.textContent = (prev === '-' ? '-' : Number(prev).toFixed(2)));
+        // delta: compare to start expected
+        const delta = (expected === undefined) ? '-' : (expected - vStart);
+        const deltaElsForStep = document.querySelectorAll(`.delta[data-step="${step}"]`);
+        deltaElsForStep.forEach(e=> e.textContent = (delta === '-' ? '-' : Number(delta).toFixed(2)));
+      }
+        updateExpectationVisibility();
+    }
+
+    // Show/hide the expected rows depending on progress
+    function updateExpectationVisibility(){
+      // Show coin row if coin has been flipped
+      const coinRow = document.querySelector('#expectTable tr[data-step="coin"]');
+      const twoRow = document.querySelector('#expectTable tr[data-step="twoDice"]');
+      const die1Row = document.querySelector('#expectTable tr[data-step="die1"]');
+      const die2Row = document.querySelector('#expectTable tr[data-step="die2"]');
+      const die3Row = document.querySelector('#expectTable tr[data-step="die3"]');
+      const totalRow = document.querySelector('#expectTable tr[data-step="total"]');
+
+      // coin visible after flip
+      if(lastCoin != null) coinRow.classList.remove('hidden-row');
+      else coinRow.classList.add('hidden-row');
+
+      // two dice visible once coin is heads and in phase 2 or beyond
+      if(phase >= 2) twoRow.classList.remove('hidden-row'); else twoRow.classList.add('hidden-row');
+
+      // die rows and total become visible once reaching phase 3
+      if(phase >= 3){
+        die1Row.classList.remove('hidden-row');
+        die2Row.classList.remove('hidden-row');
+        die3Row.classList.remove('hidden-row');
+        totalRow.classList.remove('hidden-row');
+      } else {
+        die1Row.classList.add('hidden-row');
+        die2Row.classList.add('hidden-row');
+        die3Row.classList.add('hidden-row');
+        totalRow.classList.add('hidden-row');
+      }
+    }
+
+    function resetGame(){
+      phase = 1;
+      lastCoin = null;
+      twoDiceValues = [null, null];
+      threeDiceValues = [null, null, null];
+      coinEl.textContent = '?';
+      renderDie(dieA, null); renderDie(dieB, null);
+      renderDie(die1, null); renderDie(die2, null); renderDie(die3, null);
+      flipBtn.disabled = false;
+      roll2Btn.disabled = true;
+      roll1Btn.disabled = true; roll2singleBtn.disabled = true; roll3Btn.disabled = true;
+      pointsValue.textContent = '-';
+      setStatus('Ready. Click <strong>Flip Coin</strong> to start.');
+      updateExpectationTable();
+      // show start (only)
+      const startRow = document.querySelector('#expectTable tr[data-step="start"]');
+      startRow.classList.remove('hidden-row');
+      // hide others
+      const others = document.querySelectorAll('#expectTable tr[data-step]:not([data-step="start"])');
+      others.forEach(r=> r.classList.add('hidden-row'));
+    }
+
+    function randInt(min, max){ return Math.floor(Math.random()*(max-min+1))+min; }
+
+    // Generic rolling helper for animations: cycles text rapidly then sets final
+    // Render pip-based die faces (1-6). If value is null, show an empty face.
+    function renderDie(el, value){
+      if(value == null){
+        el.innerHTML = '<div class="pips empty">' + Array.from({length:9}).map(()=>'<div class="cell"></div>').join('') + '</div>';
+        return;
+      }
+      const v = Number(value);
+      // positions 1..9 (row-major)
+      const faces = {
+        1: [5],
+        2: [1,9],
+        3: [1,5,9],
+        4: [1,3,7,9],
+        5: [1,3,5,7,9],
+        6: [1,3,4,6,7,9]
+      };
+      const show = faces[v] || [];
+      let cells = '';
+      for(let i=1;i<=9;i++){
+        if(show.includes(i)) cells += '<div class="cell"><div class="pip"></div></div>';
+        else cells += '<div class="cell"></div>';
+      }
+      el.innerHTML = `<div class="pips">${cells}</div>`;
+    }
+
+    function animateRandom(el, duration=900){
+      el.classList.add('rolling');
+      const interval = 80;
+      const it = setInterval(()=>{
+        const temp = randInt(1,6);
+        renderDie(el, temp);
+      }, interval);
+      return new Promise(resolve=>{
+        setTimeout(()=>{
+          clearInterval(it);
+          el.classList.remove('rolling');
+          const final = randInt(1,6);
+          renderDie(el, final);
+          resolve(final);
+        }, duration);
+      });
+    }
+
+    // Coin flip
+    flipBtn.addEventListener('click', async ()=>{
+      flipBtn.disabled = true;
+      setStatus('Flipping coin...');
+      // animate by toggling H/T quickly then choose final
+      coinEl.classList.add('rolling');
+      const choices = ['H','T'];
+      const final = await new Promise(resolve=>{
+        const duration = 900;
+        const interval = 80;
+        const it = setInterval(()=> coinEl.textContent = choices[randInt(0,1)], interval);
+        setTimeout(()=>{ clearInterval(it); coinEl.classList.remove('rolling'); const v = choices[randInt(0,1)]; coinEl.textContent = v; resolve(v); }, duration);
+      });
+      lastCoin = final;
+      if(final === 'H'){
+        setStatus('You got <span class="ok">Heads</span>. Proceed to Phase 2: roll two dice.', 'ok');
+        phase = 2;
+        roll2Btn.disabled = false;
+        updateExpectationTable();
+        // allow two-dice rolling
+      } else {
+        setStatus('You got <span class="bad">Tails</span>. Game over. Click <strong>Reset Game</strong> to try again.', 'bad');
+        phase = 0; // ended
+        // disable next controls
+        roll2Btn.disabled = true;
+        updateExpectationTable();
+      }
+      // Keep flip enabled to allow repeated flips only if not progressed
+      if(phase === 2) flipBtn.disabled = true;
+    });
+
+    // Two-dice roll
+    roll2Btn.addEventListener('click', async ()=>{
+      roll2Btn.disabled = true;
+      setStatus('Rolling two dice...');
+      // animate two dice together
+      const choices = ['1','2','3','4','5','6'];
+      // simulate both
+      const resultA = await animateRandom(dieA);
+      const resultB = await animateRandom(dieB);
+      const a = Number(resultA), b = Number(resultB);
+      twoDiceValues = [a,b];
+      const sum = a + b;
+      if(sum === 7){
+        setStatus(`Rolled ${a} + ${b} = <span class="bad">7</span>. Game over. Click <strong>Reset Game</strong> to try again.`, 'bad');
+        phase = 0;
+        // disable final phase
+        roll1Btn.disabled = true; roll2singleBtn.disabled = true; roll3Btn.disabled = true;
+        updateExpectationTable();
+      } else {
+        setStatus(`Rolled ${a} + ${b} = <span class="ok">${sum}</span>. Proceed to Phase 3: roll the three dice.`, 'ok');
+        phase = 3;
+        // enable the three individual roll buttons
+        roll1Btn.disabled = false; roll2singleBtn.disabled = false; roll3Btn.disabled = false;
+        updateExpectationTable();
+      }
+    });
+
+    // Individual three dice rolls
+    async function rollSingle(idx){
+      const el = idx===0?die1:idx===1?die2:die3;
+      renderDie(el, null);
+      const final = await animateRandom(el);
+      threeDiceValues[idx] = Number(final);
+      updateExpectationTable();
+      computeFinalIfReady();
+    }
+
+    function computeFinalIfReady(){
+      const [v1,v2,v3] = threeDiceValues;
+      if(v1!=null && v2!=null && v3!=null){
+        const points = v1 + v3 - v2;
+        setStatus(`Final dice: ${v1}, ${v2}, ${v3}. Points = ${v1} + ${v3} - ${v2} = <strong>${points}</strong>. Click <strong>Reset Game</strong> to play again.`, 'ok');
+        // update points box
+        pointsValue.textContent = points;
+        // disable final roll buttons until reset
+        roll1Btn.disabled = true; roll2singleBtn.disabled = true; roll3Btn.disabled = true;
+        phase = 0; // finished
+      } else {
+        const parts = threeDiceValues.map(v=> v==null?'-':v).join(', ');
+        setStatus(`Rolling Phase 3. Current dice: ${parts}.`, '');
+      }
+    }
+
+    roll1Btn.addEventListener('click', ()=> rollSingle(0));
+    roll2singleBtn.addEventListener('click', ()=> rollSingle(1));
+    roll3Btn.addEventListener('click', ()=> rollSingle(2));
+
+    resetBtn.addEventListener('click', ()=>{
+      resetGame();
+    });
+
+    // Initialize
+    resetGame();
+    // initial expectation table render
+    updateExpectationTable();
+  </script>
+</body>
+</html>
